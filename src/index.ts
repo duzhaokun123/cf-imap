@@ -561,5 +561,42 @@ export class CFImap {
 
         return true
     }
+
+    /**
+     * Appends (uploads) an email to the specified mailbox.
+     *
+     * @param mailbox The name of the mailbox to append the email to.
+     * @param data The raw email data to append.
+     */
+    append = async (mailbox: string, data: string) => {
+        if (!this.socket || !this.reader || !this.writer) throw new Error("Not initialised")
+
+        let query = [
+            `A012 APPEND "${mailbox}" `,
+            `{${data.length}}\r\n`,
+        ]
+
+        let encoded = await this.encoder.encode(query.join(""))
+
+        await this.writer.write(encoded)
+
+        let decoded = await this.decoder.decode((await this.reader.read()).value)
+
+        let responses = decoded.split("\r\n")
+
+        if (responses.length < 2 || !responses[0].startsWith("+")) {
+            throw new Error("IMAP server did not respond with continuation request", { cause: responses })
+        }
+
+        let dataEncoded = await this.encoder.encode(data + "\r\n")
+
+        await this.writer.write(dataEncoded)
+
+        decoded = await this.decoder.decode((await this.reader.read()).value)
+
+        responses = decoded.split("\r\n")
+
+        return responses
+    }
 }
 
